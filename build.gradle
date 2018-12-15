@@ -1,0 +1,44 @@
+buildscript {
+    repositories {
+	jcenter()
+	mavenCentral()
+    }
+    dependencies {
+        classpath 'com.bmuschko:gradle-docker-plugin:4.1.0'
+    }
+}
+
+apply plugin: 'com.bmuschko.docker-remote-api'
+
+import com.bmuschko.gradle.docker.tasks.image.*
+import com.bmuschko.gradle.docker.tasks.container.*
+
+task createDockerfile(type: Dockerfile) {
+    destFile = project.file('./Dockerfile')
+    from 'python:alpine3.8'
+    addFile('requirements.txt', '/requirements.txt')
+    runCommand('pip install  -r /requirements.txt')
+    addFile('./app', '/app')
+    workingDir('/app')
+    exposePort 80
+    defaultCommand('python3','app.py')  
+}
+
+task buildImage(type: DockerBuildImage) {
+    dependsOn createDockerfile
+    inputDir = createDockerfile.destFile.get().asFile.parentFile
+    tag = 'serv:latest'
+}
+
+task createContainer(type: DockerCreateContainer) {
+    dependsOn buildImage
+    targetImageId buildImage.getImageId()
+    containerName = 'xmltojson_service'
+    portBindings = ['80:80']
+    autoRemove = true
+}
+
+task startContainer(type: DockerStartContainer) {
+    dependsOn createContainer
+    targetContainerId createContainer.getContainerId()
+}
